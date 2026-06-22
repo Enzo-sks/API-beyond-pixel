@@ -18,7 +18,7 @@ import torch
 import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
-from transformers import ViTModel
+from transformers import ViTConfig, ViTModel
 from tokenizers import Tokenizer
 
 from app.config import (
@@ -53,13 +53,18 @@ _IMAGE_TF = transforms.Compose([
 
 
 def _build_model(device: torch.device) -> MultimodalFusion:
-    """Reconstruit l'architecture exacte utilisée à l'entraînement."""
+    """Reconstruit l'architecture EXACTE utilisée à l'entraînement."""
+
+    # Encoder texte
     bert = BERTForMLM(TEXT_VOCAB_SIZE, TEXT_D, TEXT_H, TEXT_N, TEXT_D_FF)
     text_encoder = bert.encoder
 
-    # ViT HuggingFace (même modèle qu'en entraînement)
-    vit = ViTModel.from_pretrained("codewithdark/vit-chest-xray")
+    # ViT reconstruit SANS poids pré-entraînés
+    # (pour matcher exactement les clés du checkpoint)
+    vit_config = ViTConfig.from_pretrained("codewithdark/vit-chest-xray")
+    vit = ViTModel(vit_config)  # pas de from_pretrained()
 
+    # Fusion multimodale
     model = MultimodalFusion(
         text_encoder=text_encoder,
         vit=vit,
@@ -68,6 +73,7 @@ def _build_model(device: torch.device) -> MultimodalFusion:
         n_heads=N_HEADS,
         dropout=DROPOUT,
     )
+
     return model.to(device)
 
 
@@ -98,31 +104,17 @@ class InferenceEngine:
             model = _build_model(self.device)
 
             print(f"[inference] Chargement des poids depuis {ckpt_path}")
-            full_state = torch.load(
+            state_dict = torch.load(
                 ckpt_path, map_location=self.device, weights_only=True
             )
 
-            # ───────────────────────────────────────────────────────────────
-            # IMPORTANT :
-            # On ignore tous les poids du ViT venant du checkpoint
-            # car ils ne correspondent plus à la version actuelle du modèle HF.
-            # On garde uniquement :
-            #   - l'encodeur texte
-            #   - la cross-attention
-            #   - la tête de classification
-            #   - le pooling image
-            # ───────────────────────────────────────────────────────────────
-            filtered_state = {
-                k: v for k, v in full_state.items()
-                if not k.startswith("vit.")
-            }
-
-            missing, unexpected = model.load_state_dict(filtered_state, strict=False)
+            # Chargement COMPLET du checkpoint (ViT + texte + fusion)
+            missing, unexpected = model.load_state_dict(state_dict, strict=False)
 
             if missing:
-                print(f"[inference] Clés manquantes (hors ViT) : {len(missing)} (ex: {missing[:5]})")
+                print(f"[inference] Clés manquantes : {len(missing)} (ex: {missing[:5]})")
             if unexpected:
-                print(f"[inference] Clés inattendues (hors ViT) : {len(unexpected)} (ex: {unexpected[:5]})")
+                print(f"[inference] Clés inattendues : {len(unexpected)} (ex: {unexpected[:5]})")
 
             model.eval()
             self.model = model
