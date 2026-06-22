@@ -1,13 +1,15 @@
-"""inference.py — Chargement du modèle MultimodalFusion + tokenizer, et
-fonction predict() utilisée par l'API FastAPI.
+"""
+inference.py — Chargement du modèle MultimodalFusion + tokenizer depuis Hugging Face,
+et fonction predict() utilisée par l'API FastAPI.
 
 Le modèle est chargé UNE SEULE FOIS au démarrage (singleton via lru_cache),
 pas à chaque requête — sinon chaque appel à /predict rechargerait 96M
 paramètres depuis le disque (très lent, surtout sur Railway).
 """
 
+from huggingface_hub import hf_hub_download
+
 import io
-import os
 from functools import lru_cache
 from typing import Optional
 
@@ -20,8 +22,6 @@ from transformers import ViTModel
 from tokenizers import Tokenizer
 
 from app.config import (
-    TOKENIZER_PATH,
-    FUSION_CKPT_PATH,
     VIT_NAME,
     TEXT_VOCAB_SIZE,
     TEXT_D,
@@ -42,7 +42,7 @@ from app.models import BERTForMLM, MultimodalFusion
 
 
 class ModelNotLoadedError(RuntimeError):
-    """Levée quand le modèle/tokenizer n'a pas pu être chargé (fichiers absents)."""
+    """Levée quand le modèle/tokenizer n'a pas pu être chargé."""
 
 
 # ── Transform image (identique à VAL_TF de train.py — PAS d'augmentation) ──
@@ -54,9 +54,7 @@ _IMAGE_TF = transforms.Compose([
 
 
 def _build_model(device: torch.device) -> MultimodalFusion:
-    """Reconstruit l'architecture exacte utilisée à l'entraînement (poids
-    HuggingFace de base pour le ViT — ils seront écrasés par le state_dict
-    complet du checkpoint multimodal_fusion.pt juste après)."""
+    """Reconstruit l'architecture exacte utilisée à l'entraînement."""
     bert = BERTForMLM(TEXT_VOCAB_SIZE, TEXT_D, TEXT_H, TEXT_N, TEXT_D_FF)
     text_encoder = bert.encoder
 
@@ -83,20 +81,25 @@ class InferenceEngine:
 
     def _load(self) -> None:
         try:
-            if not os.path.exists(TOKENIZER_PATH):
-                raise FileNotFoundError(f"tokenizer.json introuvable : {TOKENIZER_PATH}")
-            if not os.path.exists(FUSION_CKPT_PATH):
-                raise FileNotFoundError(f"checkpoint introuvable : {FUSION_CKPT_PATH}")
+            print("[inference] Téléchargement du tokenizer depuis Hugging Face…")
+            tokenizer_path = hf_hub_download(
+                repo_id="Enzo-sks/cxr-multimodal-fusion2",
+                filename="tokenizer.json"
+            )
+            self.tokenizer = Tokenizer.from_file(tokenizer_path)
 
-            print(f"[inference] Chargement du tokenizer depuis {TOKENIZER_PATH}")
-            self.tokenizer = Tokenizer.from_file(TOKENIZER_PATH)
+            print("[inference] Téléchargement du checkpoint depuis Hugging Face…")
+            ckpt_path = hf_hub_download(
+                repo_id="Enzo-sks/cxr-multimodal-fusion2",
+                filename="multimodal_fusion.pt"
+            )
 
-            print(f"[inference] Construction de l'architecture MultimodalFusion ...")
+            print("[inference] Construction de l'architecture MultimodalFusion…")
             model = _build_model(self.device)
 
-            print(f"[inference] Chargement des poids depuis {FUSION_CKPT_PATH}")
+            print(f"[inference] Chargement des poids depuis {ckpt_path}")
             state_dict = torch.load(
-                FUSION_CKPT_PATH, map_location=self.device, weights_only=True
+                ckpt_path, map_location=self.device, weights_only=True
             )
             missing, unexpected = model.load_state_dict(state_dict, strict=False)
             if missing:
@@ -125,28 +128,26 @@ class InferenceEngine:
         enc = self.tokenizer.encode(text)
         ids = enc.ids[:MAX_TEXT_LEN] if MAX_TEXT_LEN else enc.ids
         if len(ids) == 0:
-            # Séquence vide → un seul token de padding pour éviter un tensor
-            # de longueur 0 (l'embedding + RoPE exigent au moins 1 position).
-            ids = [0]
-        return torch.tensor(ids, dtype=torch.long, device=self.device).unsqueeze(0)  # (1, L)
+            ids = [0]  # éviter une séquence vide
+        return torch.tensor(ids, dtype=torch.long, device=self.device).unsqueeze(0)
 
     def _encode_image(self, image_bytes: bytes) -> torch.Tensor:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        pixel_values = _IMAGE_TF(img)  # (3, 224, 224)
-        return pixel_values.unsqueeze(0).to(self.device)  # (1, 3, 224, 224)
+        pixel_values = _IMAGE_TF(img)
+        return pixel_values.unsqueeze(0).to(self.device)
 
     @torch.no_grad()
     def predict(self, image_bytes: bytes, findings: str, threshold: float = 0.5) -> dict:
         if not self.is_ready:
             raise ModelNotLoadedError(
-                self._load_error or "Modèle non chargé (raison inconnue)."
+                self._load_error or "Modèle non chargé."
             )
 
         input_ids = self._encode_text(findings)
         pixel_values = self._encode_image(image_bytes)
 
-        logits = self.model(input_ids, pixel_values)         # (1, 21)
-        probs = torch.sigmoid(logits).squeeze(0).cpu().numpy()  # (21,)
+        logits = self.model(input_ids, pixel_values)
+        probs = torch.sigmoid(logits).squeeze(0).cpu().numpy()
 
         results = [
             {
@@ -169,5 +170,4 @@ class InferenceEngine:
 
 @lru_cache(maxsize=1)
 def get_engine() -> InferenceEngine:
-    """Singleton — le modèle est chargé une seule fois pour tout le process."""
     return InferenceEngine()
