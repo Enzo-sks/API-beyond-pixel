@@ -58,7 +58,7 @@ def _build_model(device: torch.device) -> MultimodalFusion:
     bert = BERTForMLM(TEXT_VOCAB_SIZE, TEXT_D, TEXT_H, TEXT_N, TEXT_D_FF)
     text_encoder = bert.encoder
 
-    vit = ViTModel.from_pretrained(VIT_NAME)
+    vit = ViTModel.from_pretrained("codewithdark/vit-chest-xray")
 
     model = MultimodalFusion(
         text_encoder=text_encoder,
