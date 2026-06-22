@@ -22,7 +22,6 @@ from transformers import ViTModel
 from tokenizers import Tokenizer
 
 from app.config import (
-    VIT_NAME,
     TEXT_VOCAB_SIZE,
     TEXT_D,
     TEXT_H,
@@ -58,6 +57,7 @@ def _build_model(device: torch.device) -> MultimodalFusion:
     bert = BERTForMLM(TEXT_VOCAB_SIZE, TEXT_D, TEXT_H, TEXT_N, TEXT_D_FF)
     text_encoder = bert.encoder
 
+    # ViT HuggingFace (même modèle qu'en entraînement)
     vit = ViTModel.from_pretrained("codewithdark/vit-chest-xray")
 
     model = MultimodalFusion(
@@ -98,14 +98,31 @@ class InferenceEngine:
             model = _build_model(self.device)
 
             print(f"[inference] Chargement des poids depuis {ckpt_path}")
-            state_dict = torch.load(
+            full_state = torch.load(
                 ckpt_path, map_location=self.device, weights_only=True
             )
-            missing, unexpected = model.load_state_dict(state_dict, strict=False)
+
+            # ───────────────────────────────────────────────────────────────
+            # IMPORTANT :
+            # On ignore tous les poids du ViT venant du checkpoint
+            # car ils ne correspondent plus à la version actuelle du modèle HF.
+            # On garde uniquement :
+            #   - l'encodeur texte
+            #   - la cross-attention
+            #   - la tête de classification
+            #   - le pooling image
+            # ───────────────────────────────────────────────────────────────
+            filtered_state = {
+                k: v for k, v in full_state.items()
+                if not k.startswith("vit.")
+            }
+
+            missing, unexpected = model.load_state_dict(filtered_state, strict=False)
+
             if missing:
-                print(f"[inference] ATTENTION — clés manquantes : {len(missing)} (ex: {missing[:5]})")
+                print(f"[inference] Clés manquantes (hors ViT) : {len(missing)} (ex: {missing[:5]})")
             if unexpected:
-                print(f"[inference] ATTENTION — clés inattendues : {len(unexpected)} (ex: {unexpected[:5]})")
+                print(f"[inference] Clés inattendues (hors ViT) : {len(unexpected)} (ex: {unexpected[:5]})")
 
             model.eval()
             self.model = model
