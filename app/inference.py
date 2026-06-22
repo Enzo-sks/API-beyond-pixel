@@ -175,7 +175,21 @@ class InferenceEngine:
             "positive_labels": positive_labels,
             "threshold": threshold,
         }
+missing, unexpected = model.load_state_dict(state_dict, strict=False)
 
+# Diagnostic détaillé
+print(f"[inference] Clés MANQUANTES : {len(missing)}")
+if missing:
+    by_module = {}
+    for k in missing:
+        mod = k.split('.')[0]
+        by_module[mod] = by_module.get(mod, 0) + 1
+    for mod, count in sorted(by_module.items()):
+        print(f"  {mod}: {count} clés manquantes")
+
+print(f"[inference] Clés INATTENDUES : {len(unexpected)}")
+if unexpected:
+    print(f"  ex: {unexpected[:3]}")
 
 @lru_cache(maxsize=1)
 def get_engine() -> InferenceEngine:
