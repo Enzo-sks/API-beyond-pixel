@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Checkpoints volumineux — à ne PAS committer sur Git si > quelques MB
+# (utilisez Git LFS, ou hébergez-les ailleurs + TOKENIZER_URL/FUSION_CKPT_URL)
+checkpoints/*.pt
+checkpoints/*.pth
+checkpoints/tokenizer.json
+
+.cache/

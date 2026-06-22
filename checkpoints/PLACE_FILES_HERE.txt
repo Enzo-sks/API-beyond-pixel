@@ -1,0 +1,9 @@
+Placez ici :
+  - tokenizer.json
+  - multimodal_fusion.pt
+
+Voir le README.md principal, section "Option A" / "Option B" pour les deux
+façons de fournir ces fichiers au conteneur Docker / à Railway.
+
+Ce dossier est volontairement vide dans le repo Git (cf. .gitignore) — ces
+fichiers sont trop volumineux et/ou sensibles pour être versionnés tels quels.

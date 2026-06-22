@@ -1,0 +1,16 @@
+# ── API ──────────────────────────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+
+# ── ML / Inférence ───────────────────────────────────────────────────────
+# torch CPU only -> voir Dockerfile (index-url pytorch CPU) pour une image
+# nettement plus légère qu'avec CUDA, suffisant pour de l'inférence simple.
+
+#torch==2.5.1
+#torchvision==0.20.1
+transformers==4.47.1
+tokenizers==0.21.0
+Pillow==11.0.0
+numpy==1.26.4
