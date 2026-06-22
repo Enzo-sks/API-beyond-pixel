@@ -14,3 +14,10 @@ transformers==4.47.1
 tokenizers==0.21.0
 Pillow==11.0.0
 numpy==1.26.4
+huggingface_hub
+
+torch
+torchvision
+
+fastapi
+uvicorn
