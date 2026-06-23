@@ -870,8 +870,16 @@ function renderResult(data){
   resultContent.style.display = 'block';
 
   const preds = data.predictions || [];
-  const positives = data.positive_labels || [];
+  let positives = data.positive_labels || [];
   const threshold = data.threshold ?? 0.5;
+
+  const hasNonNormalPositive = positives.some(label => label.toLowerCase() !== 'normal');
+  const visiblePreds = hasNonNormalPositive
+    ? preds.filter(p => p.label.toLowerCase() !== 'normal')
+    : preds;
+  if (hasNonNormalPositive) {
+    positives = positives.filter(label => label.toLowerCase() !== 'normal');
+  }
 
   lastResults = { preds, positives, threshold };
 
@@ -884,9 +892,9 @@ function renderResult(data){
   }
 
   scopeEl.innerHTML = '';
-  const maxProb = Math.max(...preds.map(p => p.probability), 0.01);
+  const maxProb = Math.max(...visiblePreds.map(p => p.probability), 0.01);
 
-  preds.forEach((p, i) => {
+  visiblePreds.forEach((p, i) => {
     const row = document.createElement('div');
     row.className = 'scope-row' + (p.positive ? ' positive' : '');
 
