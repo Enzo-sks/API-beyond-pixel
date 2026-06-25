@@ -654,12 +654,12 @@
       </div>
       <div class="threshold-fixed-right">
         <div>
-          <div class="threshold-fixed-value">0.72</div>
-          <div class="threshold-fixed-pct">72 %</div>
+          <div class="threshold-fixed-value">0.70</div>
+          <div class="threshold-fixed-pct">70 %</div>
         </div>
       </div>
     </div>
-    <!-- Mini visual bar showing the 72% cutoff -->
+    <!-- Mini visual bar showing the 70% cutoff -->
     <div style="margin-top:14px;padding:0 2px 28px;">
       <div class="threshold-viz">
         <div class="threshold-viz-fill"></div>
@@ -929,14 +929,14 @@ function renderResult(data){
   resultContent.style.display='block';
   const preds=data.predictions||[];
   let positives=data.positive_labels||[];
-  const threshold = FIXED_THRESHOLD; // always use 0.72 for display
+  const threshold = FIXED_THRESHOLD; // always use 0.70 for display
 
   const hasNonNormal=positives.some(l=>l.toLowerCase()!=='normal');
   const visiblePreds=hasNonNormal?preds.filter(p=>p.label.toLowerCase()!=='normal'):preds;
   if(hasNonNormal) positives=positives.filter(l=>l.toLowerCase()!=='normal');
   lastResults={preds,positives,threshold};
 
-  resultMeta.textContent=`threshold 0.72 (72%) · ${preds.length} conditions`;
+  resultMeta.textContent=`threshold 0.70 (70%) · ${preds.length} conditions`;
 
   const band=0.10;
   const borderline=visiblePreds.filter(p=>!p.positive&&p.probability<threshold&&p.probability>=threshold-band);
@@ -975,7 +975,7 @@ copyBtn.addEventListener('click', ()=>{
   if(!lastResults)return;
   const {preds,positives,threshold}=lastResults;
   let text='Beyond Pixels Analysis Results\n==============================\n\n';
-  text+=`Threshold: 0.72 (72%) — fixed\n`;
+  text+=`Threshold: 0.70 (70%) — fixed\n`;
   text+=`Conditions above threshold: ${positives.length}\n`;
   if(positives.length)text+=positives.join(', ')+'\n';
   text+='\nDetailed Results:\n------------------------\n';
