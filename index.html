@@ -707,7 +707,7 @@
         <div class="progress-track">
           <div class="progress-fill" id="progressFill"></div>
         </div>
-        <span class="progress-hint">Full analysis typically takes about 2 minutes maximum.</span>
+        <span class="progress-hint">Full analysis typically takes about 1 minute.</span>
       </div>
     </div>
 
@@ -865,13 +865,13 @@ const progressStage = document.getElementById('progressStage');
 const progressTime  = document.getElementById('progressTime');
 const progressFill  = document.getElementById('progressFill');
 const STAGES = [
-  {at:0, label:'Uploading image…'},{at:4, label:'Preprocessing X-ray…'},
-  {at:18, label:'Running model inference…'},{at:90, label:'Cross-referencing radiology report…'},
-  {at:140, label:'Calibrating probabilities…'},{at:165, label:'Finalizing results…'}
+  {at:0, label:'Uploading image…'},{at:3, label:'Preprocessing X-ray…'},
+  {at:10, label:'Running model inference…'},{at:35, label:'Cross-referencing radiology report…'},
+  {at:50, label:'Calibrating probabilities…'},{at:56, label:'Finalizing results…'}
 ];
 let progTimer=null, progStart=null;
 function fmtTime(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
-function progPct(s){ return Math.min((1-Math.exp(-1.6*s/180))*96,96); }
+function progPct(s){ return Math.min((1-Math.exp(-1.6*s/60))*96,96); }
 function stageFor(s){ let l=STAGES[0].label; for(const st of STAGES){ if(s>=st.at)l=st.label; } return l; }
 function startProgress(){
   progStart=Date.now(); progressBlock.classList.add('show');
